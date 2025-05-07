@@ -1,0 +1,4 @@
+kafka-python
+psycopg2-binary
+langdetect
+requests
