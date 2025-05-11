@@ -30,36 +30,8 @@ services:
     volumes:
       - ./database:/app
     environment:
-      DB_URL: "postgresql://admin:pass@cockroachdb:26257/videos"
+      DB_URL: "postgresql://m_mind:JvARh8lNgcKwExvuGxM4ew@big-data-project-6437.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/trending?sslmode=verify-full"
       KAFKA_BROKER: "kafka:9092"
     depends_on:
       - kafka
-      - cockroachdb
-    networks:
-      default:
-
-  fill_categories:
-    build:
-      context: ./database
-    depends_on:
-      - cockroachdb
-    networks:
-      default:
-        aliases:
-          - fill_categories
-    volumes:
-      - ./scraper:/app/scraper  # Mount the scraper folder
-    environment:
-      - API_KEY=/app/scraper/api_key.txt
-
-  cockroachdb:
-    image: cockroachdb/cockroach:v22.2.7
-    command: start-single-node --insecure
-    ports:
-      - "26257:26257"
-      - "8080:8080"
-    volumes:
-      - cockroach-data:/cockroach/cockroach-data
-
-volumes:
-  cockroach-data:
+    command: ["/app/wait-for-kafka.sh", "kafka", "9092", "python", "kafka_consumer.py"]

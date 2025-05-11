@@ -4,7 +4,7 @@ import psycopg2
 from langdetect import detect
 
 # Database connection string
-DB_URL = "postgresql://admin:pass@cockroachdb:26257/videos"
+DB_URL = "postgresql://m_mind:JvARh8lNgcKwExvuGxM4ew@big-data-project-6437.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/trending?sslmode=verify-full"
 
 # Establish connection
 conn = psycopg2.connect(DB_URL)
@@ -20,18 +20,16 @@ consumer = KafkaConsumer(
 )
 
 def transform_video(video):
-    # Extract nested fields
-    video_data = video.get("video", {})
+    # Extract fields
+    video_id = video.get("video_id", None)
     region = video.get("region", "unknown")
-
-    # Handle missing fields
-    video_id = video_data.get("id", None)
-    title = video_data.get("snippet", {}).get("title", None)
-    category_id = video_data.get("snippet", {}).get("categoryId", None)
-    published_at = video_data.get("snippet", {}).get("publishedAt", None)
-    views = int(video_data.get("statistics", {}).get("viewCount", 0))
-    likes = int(video_data.get("statistics", {}).get("likeCount", 0))
-    comments = int(video_data.get("statistics", {}).get("commentCount", 0))
+    title = video.get("title", None)
+    category_id = video.get("categoryId", None)
+    published_at = video.get("publishedAt", None)
+    trending_at = video.get("trending_date", None)
+    views = int(video.get("view_count", 0))
+    likes = int(video.get("likes", 0))
+    comments = int(video.get("comment_count", 0))
 
     # Compute like rate
     like_rate = likes / views if views else 0
@@ -45,6 +43,7 @@ def transform_video(video):
         "category_id": category_id,
         "region": region,
         "published_at": published_at,
+        "trending_at": trending_at,
         "views": views,
         "likes": likes,
         "comments": comments,
@@ -66,7 +65,7 @@ for msg in consumer:
         transformed_video = transform_video(video)
         cursor.execute(upsert_sql, (
             transformed_video["video_id"], transformed_video["title"], transformed_video["category_id"],
-            transformed_video["region"], transformed_video["published_at"], None,  # trending_at is not provided
+            transformed_video["region"], transformed_video["published_at"], transformed_video["trending_at"],
             transformed_video["views"], transformed_video["likes"], transformed_video["comments"],
             transformed_video["like_rate"], transformed_video["language"]
         ))
