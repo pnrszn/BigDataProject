@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,11 +13,8 @@ import os
 KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'kafka:9092')
 API_KEY = open("api_key.txt").read().strip()
 
-features = ["title",
-            "publishedAt",
-            "channelId",
-            "channelTitle",
-            "categoryId"]
+features = ["title", "publishedAt", "channelId", "channelTitle", "categoryId"]
+PREV_FILE = "prev_videos.json" 
 
 def create_kafka_producer(retries=10, delay=5):
     for attempt in range(1, retries + 1):
@@ -35,6 +33,37 @@ def create_kafka_producer(retries=10, delay=5):
 
 producer = create_kafka_producer()
 
+def load_previous_videos():
+    if os.path.exists(PREV_FILE):
+        with open(PREV_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_current_videos(video_dict):
+    with open(PREV_FILE, "w", encoding="utf-8") as f:
+        json.dump(video_dict, f, ensure_ascii=False, indent=2)
+
+def assign_trending_dates(current_videos):
+    previous_videos = load_previous_videos()
+    updated_video_dict = previous_videos.copy()
+    results = []
+
+    for video in current_videos:
+        video_id = video["video_id"]
+        
+        if video_id not in previous_videos:
+            trending_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            updated_video_dict[video_id] = trending_date
+            video["trending_date"] = trending_date
+        else:
+            video["trending_date"] = previous_videos[video_id]
+
+        results.append(video)
+
+    save_current_videos(updated_video_dict)
+    return results
+
+
 def get_videos(items):
     videos = []
     for video in items:
@@ -50,31 +79,15 @@ def get_videos(items):
 
         description = snippet.get("description", "")
         thumbnail_link = snippet.get("thumbnails", {}).get("default", {}).get("url", "")
-        trending_date = time.strftime("%Y-%m-%d")
         tags = snippet.get("tags", ["[none]"])
         view_count = statistics.get("viewCount", 0)
+        comment_count = statistics.get("commentCount", 0)
 
-        # Ratings
-        if 'likeCount' in statistics and 'dislikeCount' in statistics:
-            likes = statistics['likeCount']
-            dislikes = statistics['dislikeCount']
-        else:
-            likes = 0
-            dislikes = 0
-
-        # Comments
-        if 'commentCount' in statistics:
-            comment_count = statistics['commentCount']
-        else:
-            comment_count = 0
 
         video_data = {
             "video_id": video_id,
-            "trending_date": trending_date,
             "tags": tags,
             "view_count": view_count,
-            "likes": likes,
-            "dislikes": dislikes,
             "comment_count": comment_count,
             "thumbnail_link": thumbnail_link,
             "description": description
@@ -105,7 +118,8 @@ def job():
         print(f"Found {len(items)} items for {country}.")
         
         parsed_videos = get_videos(items) 
-
+        parsed_videos = assign_trending_dates(parsed_videos)
+        
         for video_data in parsed_videos:
             video_data["region"] = country  
             all_data.append(video_data)
