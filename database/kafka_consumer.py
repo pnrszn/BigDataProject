@@ -28,11 +28,7 @@ def transform_video(video):
     published_at = video.get("publishedAt", None)
     trending_at = video.get("trending_date", None)
     views = int(video.get("view_count", 0))
-    likes = int(video.get("likes", 0))
     comments = int(video.get("comment_count", 0))
-
-    # Compute like rate
-    like_rate = likes / views if views else 0
 
     # Detect language
     language = detect(title) if title else None
@@ -45,18 +41,16 @@ def transform_video(video):
         "published_at": published_at,
         "trending_at": trending_at,
         "views": views,
-        "likes": likes,
         "comments": comments,
-        "like_rate": like_rate,
         "language": language,
     }
 
 upsert_sql = """
 UPSERT INTO videos (
   video_id, title, category_id, region,
-  published_at, trending_at, views, likes,
-  comments, like_rate, language
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+  published_at, trending_at, views,
+  comments, language
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 for msg in consumer:
@@ -66,8 +60,7 @@ for msg in consumer:
         cursor.execute(upsert_sql, (
             transformed_video["video_id"], transformed_video["title"], transformed_video["category_id"],
             transformed_video["region"], transformed_video["published_at"], transformed_video["trending_at"],
-            transformed_video["views"], transformed_video["likes"], transformed_video["comments"],
-            transformed_video["like_rate"], transformed_video["language"]
+            transformed_video["views"], transformed_video["comments"], transformed_video["language"]
         ))
         conn.commit()
         consumer.commit()
