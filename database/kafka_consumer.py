@@ -6,10 +6,11 @@ from langdetect import detect
 # Database connection string
 DB_URL = "postgresql://m_mind:JvARh8lNgcKwExvuGxM4ew@big-data-project-6437.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/trending?sslmode=verify-full"
 
-# Establish connection
+# Connect to the Database
 conn = psycopg2.connect(DB_URL)
 cursor = conn.cursor()
 
+#Consumer setup
 consumer = KafkaConsumer(
     "youtube_trending",
     bootstrap_servers="kafka:9092",
@@ -30,7 +31,6 @@ def transform_video(video):
     views = int(video.get("view_count", 0))
     comments = int(video.get("comment_count", 0))
 
-    # Detect language
     language = detect(title) if title else None
 
     return {
@@ -65,6 +65,6 @@ for msg in consumer:
         conn.commit()
         consumer.commit()
     except Exception as e:
-        conn.rollback()  # Roll back the transaction on error
+        conn.rollback()  # Rollback if there is an error 
         print(f"Error processing video: {e}")
         print(f"Failed video data: {video}")
